@@ -1,0 +1,36 @@
+new_project/
+│
+├── data/                     # Thư mục chứa dữ liệu đầu vào, đầu ra
+│   ├── raw/                  # Dữ liệu thô chưa qua xử lý
+│   ├── processed/            # Dữ liệu đã được xử lý
+│   └── external/             # Dữ liệu từ các nguồn bên ngoài
+│
+├── docs/                     # Thư mục chứa tài liệu của dự án
+│   └── ...                   # Tài liệu hướng dẫn sử dụng, báo cáo, vv.
+│
+├── notebooks/                # Thư mục chứa các notebook Jupyter
+│   └── ...                   # Các notebook cho việc phân tích, thử nghiệm
+│
+├── src/                      # Thư mục chứa mã nguồn của dự án
+│   ├── __init__.py           # Tệp khởi tạo cho thư mục src
+│   ├── main.py               # Tệp chính để chạy dự án
+│   ├── utils/                # Thư mục chứa các hàm, tiện ích chung
+│   │   ├── __init__.py
+│   │   └── utils.py
+│   ├── modules/              # Thư mục chứa các module hoặc thành phần chính của dự án
+│   │   ├── __init__.py
+│   │   └── module1.py
+│   └── ...                   # Các tệp mã nguồn khác
+│
+├── tests/                    # Thư mục chứa các tệp kiểm thử
+│   ├── __init__.py
+│   ├── test_main.py
+│   └── ...                   # Các tệp kiểm thử khác
+│
+├── scripts/                  # Thư mục chứa các script hữu ích, các lệnh, và các tệp batch
+│   └── ...                   # Các script để chạy phân tích, đào tạo mô hình, vv.
+│
+├── .gitignore                # Tệp cấu hình Git để bỏ qua các tệp không cần thiết
+├── README.md                 # Tệp mô tả dự án, cách cài đặt và sử dụng
+├── requirements.txt          # Danh sách các thư viện cần thiết cho dự án
+└── setup.py                  # Tệp cấu hình cho việc đóng gói và cài đặt dự án
