@@ -9,6 +9,7 @@ import re
 from interact_drive import authorize_and_create_drive, upload_to_drive, create_folder_if_not_exists
 from config.config import csv_folder_path
 
+# Function 1---------------------------------------------------------------------------
 def get_binance_data(symbol, days):
     # Mã thực thi của hàm
 
@@ -53,7 +54,7 @@ def get_binance_data(symbol, days):
     df.to_csv(file_path, index=False, float_format='%.2f')
     print(f"DataFrame đã được lưu vào {file_path}")
 
-
+# Function 2----------------------------------------------------------------------
 def get_binance_data_to_gdrive(symbol, days):
     # Mã thực thi của hàm
 

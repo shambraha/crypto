@@ -29,6 +29,19 @@ def add_trace_candlestick(fig, df_resampled, name, yaxis='y', color_scheme=None)
                             decreasing_line_color=color_scheme['decreasing']  # Màu cho nến giảm
                         ))    
 
+def add_trace_line(fig, df_resampled, name, yaxis='y', color_scheme=None):
+    # Thiết lập màu mặc định nếu không có color_scheme được truyền vào
+    if color_scheme is None:
+        color_scheme = {'increasing': '#00cc96', 'decreasing': '#ff3b30'}  # Màu mặc định
+
+    fig.add_trace(go.Scatter(x=df_resampled.index, 
+                            y=df_resampled['Close'],
+                            mode='lines', # có thể thay bằng 'markers' hoặc 'lines+markers'
+                            name=name,                            
+                            yaxis=yaxis,      
+                            line=dict(color=color_scheme['increasing'])           
+                        ))   
+
 # Function 3---------------------------------------------
 def update_yaxis_layout(fig, yaxis_name):
     fig.update_layout({
@@ -38,3 +51,4 @@ def update_yaxis_layout(fig, yaxis_name):
             side='right' 
         )
     })
+
