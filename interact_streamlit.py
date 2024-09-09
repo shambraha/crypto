@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
 
@@ -51,4 +52,3 @@ def update_yaxis_layout(fig, yaxis_name):
             side='right' 
         )
     })
-

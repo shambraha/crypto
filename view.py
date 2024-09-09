@@ -11,7 +11,7 @@ st.set_page_config(layout="wide")
 from config.config import csv_folder_path
 from interact_binanceApi import get_binance_data_to_gdrive, get_binance_data
 
-#region Phần chọn [1/2 of 2]: Sử dụng Local
+#region Phần chọn [1/3 of 3]: Sử dụng Local
 # st.sidebar.header("Local Data Operations")
 # # Thêm một ô nhập symbol cho việc tải xuống local
 # input_symbol_local = st.sidebar.text_input("Enter Symbol for Local", value="")
@@ -32,7 +32,7 @@ from interact_binanceApi import get_binance_data_to_gdrive, get_binance_data
 # dfs = {symbol: get_df_from_name(symbol) for symbol in selected_symbols}
 #endregion
 
-#region Phần chọn [2/2 of 2]: Sử dụng Google Drive
+#region Phần chọn [2/3 of 3]: Sử dụng Google Drive
 # st.sidebar.header("Google Drive Data Operations")
 # # Thêm một ô nhập symbol cho việc tải xuống Google Drive
 # input_symbol_drive = st.sidebar.text_input("Enter Symbol for Google Drive", value="")
@@ -53,7 +53,7 @@ from interact_binanceApi import get_binance_data_to_gdrive, get_binance_data
 # dfs = {symbol: get_df_from_name_gdrive(drive, symbol) for symbol in selected_symbols}
 #endregion
 
-#region Phần chọn [3/3 of 3]:
+#region Phần chọn [3/3 of 3]: Thêm tính năng symbol-by-tags
 st.sidebar.header("Local Data Operations")
 
 # Đọc toàn bộ tags từ CSV và tạo symbol_tags
@@ -88,7 +88,7 @@ available_tags = list_all_tags(symbol_tags, selected_exchange)
 selected_tag = st.sidebar.selectbox("Select Tag", available_tags)
 
 # Nút để thêm symbols theo tag vào dfs
-if st.sidebar.button("Add Symbols by Tag"):
+if st.sidebar.button("Download Symbols by Tag"):
     # Lấy các symbols có tag đã chọn cho exchange đã chọn
     symbols_with_tag = get_symbols_with_tag(symbol_tags, selected_exchange, selected_tag)
     
@@ -107,10 +107,8 @@ if st.sidebar.button("Add Symbols by Tag"):
                 available_symbols_local = extract_symbols_from_local_path(csv_folder_path)
             # Sau khi chắc chắn đã tải về hoặc có sẵn trong local, thêm vào dfs
             dfs[symbol] = get_df_from_name(symbol)
-            st.success(f"Added {symbol} to data frames.")
-            
+            st.success(f"Added {symbol} to data frames.")          
                 
-
 #endregion
 
 #region the rest
