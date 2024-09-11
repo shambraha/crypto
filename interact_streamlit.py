@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # Function 1---------------------------------------------
 # Tạo sidebar lựa chọn bên trái
@@ -52,3 +53,39 @@ def update_yaxis_layout(fig, yaxis_name):
             side='right' 
         )
     })
+
+
+# Function 4---------------------------------------------
+# Hàm để vẽ biểu đồ so sánh giữa hai tuần
+def plot_weeks_comparison(week1_df, year1, week1, week2_df, year2, week2):
+    fig = make_subplots(rows=1, cols=2, subplot_titles=(f'Week {week1} ({year1})', 
+                                                        f'Week {week2} ({year2})'))
+
+    trace1 = go.Scatter(
+        x=week1_df.index,
+        y=week1_df['Close'],
+        mode='lines',
+        name=f'Week {week1} ({year1})',
+        line=dict(color='blue')
+    )
+
+    trace2 = go.Scatter(
+        x=week2_df.index,
+        y=week2_df['Close'],
+        mode='lines',
+        name=f'Week {week2} ({year2})',
+        line=dict(color='orange')
+    )
+
+    fig.add_trace(trace1, row=1, col=1)
+    fig.add_trace(trace2, row=1, col=2)
+
+    fig.update_layout(
+        title_text="So sánh giá Close giữa hai tuần",
+        dragmode='zoom',
+        height=600,
+        width=1200,
+        showlegend=True
+    )
+
+    st.plotly_chart(fig)

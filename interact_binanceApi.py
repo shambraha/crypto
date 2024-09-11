@@ -103,7 +103,8 @@ def get_binance_data_to_gdrive(symbol, days):
 
 # # Get Klines Datas from Binance using API, input (string: symbol, number: days)
 # available_symbols = ['BTC', 'ETH']
-# for symbol in available_symbols:
-#     full_symbol = f"{symbol}USDT"  # Chuyển đổi BTC thành BTCUSDT, ETH thành ETHUSDT, ...
-#     #get_binance_data(symbol, 365)
-#     get_binance_data_to_gdrive(symbol, 365)
+available_symbols = ['BTC']
+for symbol in available_symbols:
+    full_symbol = f"{symbol}USDT"  # Chuyển đổi BTC thành BTCUSDT, ETH thành ETHUSDT, ...
+    get_binance_data(symbol, 730)
+    #get_binance_data_to_gdrive(symbol, 730)
