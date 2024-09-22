@@ -3,6 +3,7 @@ import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from interact_binanceApi import update_symbol_single
 
 # Function 1---------------------------------------------
 # Tạo sidebar lựa chọn bên trái
@@ -89,3 +90,50 @@ def plot_weeks_comparison(week1_df, year1, week1, week2_df, year2, week2):
     )
 
     st.plotly_chart(fig)
+
+# Function 5---------------------------------------------
+def update_symbol_progress(available_symbols_local):
+    """
+    Hàm cập nhật từng symbol với tiến độ hiển thị ở màn hình chính.
+    
+    available_symbols_local: Danh sách các symbols có sẵn trong thư mục CSV.
+    """
+    num_symbols = len(available_symbols_local)
+    
+    # Thanh tiến độ
+    progress_bar = st.progress(0)
+    
+    # Danh sách lưu kết quả
+    symbols_success = []
+    symbols_error = []
+
+    # Vùng hiển thị thông tin cập nhật
+    status_area = st.empty()
+
+    for i, symbol in enumerate(available_symbols_local):
+        # Hiển thị tiến độ và cập nhật symbol
+        with st.spinner(f"Updating {symbol} ({i+1}/{num_symbols})..."):
+            result, error = update_symbol_single(symbol)
+
+            # Lưu kết quả cập nhật
+            if result:
+                symbols_success.append(symbol)
+            else:
+                symbols_error.append((symbol, error))
+        
+        # Cập nhật thanh tiến độ
+        progress_bar.progress((i + 1) / num_symbols)
+
+        # Hiển thị cập nhật ngay sau khi xử lý xong mỗi symbol
+        status_area.text(f"Updated {i + 1}/{num_symbols} symbols...")
+
+    # Hiển thị danh sách các symbols đã cập nhật thành công và gặp lỗi sau khi hoàn tất
+    st.write(f"Updated {len(symbols_success)} symbols successfully.")
+    st.text_area("Symbols Updated", value="\n".join(symbols_success), height=100)
+    
+    if symbols_error:
+        st.write(f"Errors with {len(symbols_error)} symbols.")
+        for symbol, error_msg in symbols_error:
+            st.write(f"{symbol}: {error_msg}")
+    
+    st.write("Update completed!")

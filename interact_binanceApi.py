@@ -99,12 +99,28 @@ def get_binance_data_to_gdrive(symbol, days):
         folder_id = create_folder_if_not_exists(drive, 'binanceCSV')
         upload_to_drive(drive, folder_id, df=df, file_name=f'binance_{pairsymbol}.csv')
     
-
+# Function 3----------------------------------------------------------------------
+def update_symbol_single(symbol):
+    """
+    Cập nhật dữ liệu cho một symbol duy nhất.
+    
+    symbol: Tên symbol cần cập nhật.
+    
+    Return:
+    - result: True nếu thành công, False nếu gặp lỗi.
+    - error: Nội dung lỗi nếu có (None nếu không có lỗi).
+    """
+    try:
+        # Cập nhật dữ liệu cho symbol
+        get_binance_data(symbol, 365)
+        return True, None  # Thành công
+    except Exception as e:
+        return False, str(e)  # Lỗi
 
 # # Get Klines Datas from Binance using API, input (string: symbol, number: days)
 # available_symbols = ['BTC', 'ETH']
-available_symbols = ['BTC']
-for symbol in available_symbols:
-    full_symbol = f"{symbol}USDT"  # Chuyển đổi BTC thành BTCUSDT, ETH thành ETHUSDT, ...
-    get_binance_data(symbol, 730)
-    #get_binance_data_to_gdrive(symbol, 730)
+# available_symbols = ['BTC']
+# for symbol in available_symbols:
+#     full_symbol = f"{symbol}USDT"  # Chuyển đổi BTC thành BTCUSDT, ETH thành ETHUSDT, ...
+#     get_binance_data(symbol, 730)
+#     #get_binance_data_to_gdrive(symbol, 730)

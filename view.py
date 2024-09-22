@@ -2,14 +2,16 @@ import os
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
+from interact_binanceApi import get_binance_data_to_gdrive, get_binance_data
 from interact_dataframe import get_df_from_name, showinfo_dtypes_head_tail, filter_and_resample_df
 from interact_dataframe import color_schemes, extract_symbols_from_local_path
-from interact_streamlit import create_sidebar_for_userinputs, add_trace_candlestick, add_trace_line, update_yaxis_layout
+from interact_streamlit import add_trace_candlestick, add_trace_line, update_yaxis_layout
+from interact_streamlit import create_sidebar_for_userinputs, update_symbol_progress
 from interact_drive import extract_symbols_from_drive, get_df_from_name_gdrive, authorize_and_create_drive
 from interact_data import read_csv_to_dict_pandas, list_all_tags, get_symbols_with_tag
 st.set_page_config(layout="wide")
 from config.config import csv_folder_path
-from interact_binanceApi import get_binance_data_to_gdrive, get_binance_data
+
 
 #region Phần chọn [1/3 of 3]: Sử dụng Local
 # st.sidebar.header("Local Data Operations")
@@ -72,6 +74,16 @@ if st.sidebar.button("downLocal"):
     else:
         st.write("Please enter a symbol to download.")
 
+if st.sidebar.button("Update Symbols"):
+    # Lấy danh sách các symbols có sẵn
+    available_symbols_local = extract_symbols_from_local_path(csv_folder_path)
+
+    if available_symbols_local:
+        update_symbol_progress(available_symbols_local)  # Gọi hàm cập nhật với tiến độ
+    else:
+        st.sidebar.write("No symbols found to update.")
+
+
 # Thêm lựa chọn nhiều symbol từ local
 # available_symbols = ['BTC', 'ETH', 'SOL', 'BNB']
 available_symbols_local = extract_symbols_from_local_path(csv_folder_path)
@@ -108,7 +120,7 @@ if st.sidebar.button("Download Symbols by Tag"):
             # Sau khi chắc chắn đã tải về hoặc có sẵn trong local, thêm vào dfs
             dfs[symbol] = get_df_from_name(symbol)
             st.success(f"Added {symbol} to data frames.")          
-                
+
 #endregion
 
 #region the rest
