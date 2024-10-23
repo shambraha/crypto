@@ -189,3 +189,20 @@ def test_model_on_batch(lstm_upgrade_model, train_loader):
     print(f"Kích thước đầu ra của mô hình: {outputs.shape}")
     print(f"Đầu ra của mô hình (outputs): {outputs}")
 
+def check_label_distribution_Xy(y_train, y_val, y_test):
+    """
+    Hàm kiểm tra phân phối nhãn trong các tập train, validation và test.
+    :param y_train: Nhãn của tập train
+    :param y_val: Nhãn của tập validation
+    :param y_test: Nhãn của tập test
+    :return: In ra phân phối nhãn của từng tập
+    """
+    def label_distribution(y, dataset_name):
+        unique, counts = np.unique(y, return_counts=True)
+        distribution = dict(zip(unique, counts))
+        print(f"Label distribution for {dataset_name}: {distribution}")
+        print(f"Proportion for {dataset_name}: {counts / len(y)}\n")
+    
+    label_distribution(y_train, 'Train')
+    label_distribution(y_val, 'Validation')
+    label_distribution(y_test, 'Test')

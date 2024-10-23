@@ -119,8 +119,8 @@ def update_symbol_single(symbol):
 
 # # Get Klines Datas from Binance using API, input (string: symbol, number: days)
 # available_symbols = ['BTC', 'ETH']
-# available_symbols = ['BTC']
+# available_symbols = ['ETH']
 # for symbol in available_symbols:
 #     full_symbol = f"{symbol}USDT"  # Chuyển đổi BTC thành BTCUSDT, ETH thành ETHUSDT, ...
-#     get_binance_data(symbol, 730)
+#     get_binance_data(symbol, 1500)
 #     #get_binance_data_to_gdrive(symbol, 730)

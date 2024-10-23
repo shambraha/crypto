@@ -7,6 +7,8 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 # Thư viện dtaidistance để tính toán Dynamic Time Warping (DTW)
 from dtaidistance import dtw
 from config.config import csv_folder_path
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from pyts.approximation import PiecewiseAggregateApproximation
 
 #folder_path = r'E:\MyPythonCode\newestCSV'
 # Đường dẫn tương đối tới thư mục 'csv' nằm trong thư mục 'data' nằm trong vị trí hiện tại
@@ -50,7 +52,7 @@ def showinfo_dtypes_head_tail(df):
     print(df.head())
     print(df.tail())
 
-# Function 4---------------------------------------------
+# Function 4A---------------------------------------------
 # Lọc dff theo khung giờ (timeframe) và khoảng thời gian tuỳ chỉnh
 def filter_and_resample_df(df, timeframe, start_time, end_time):
     # Filter df based on user inputs [start_time, end_time]
@@ -68,6 +70,15 @@ def filter_and_resample_df(df, timeframe, start_time, end_time):
     # }).dropna()
     return df1_resampled
 
+# Function 4B---------------------------------------------
+# đúng như tên hàm, resample df theo timeframe chỉ định
+def resample_df(df, timeframe):
+    resample_rule = timeframe
+    df_resampled = df.resample(resample_rule, on='Formated Time').agg({
+        'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
+    }).dropna()
+    return df_resampled
+
 # Function 5----------------------------------------------
 # Hàm liệt kê các tệp CSV trong thư mục cục bộ và trích xuất symbols
 def extract_symbols_from_local_path(local_folder_path):
@@ -80,6 +91,132 @@ def extract_symbols_from_local_path(local_folder_path):
             symbol = file_name.split('_')[1].replace('USDT.csv', '')
             symbols.append(symbol)
     return symbols
+
+# Function 6----------------------------------------------
+# Tạo danh sách các cửa sổ trượt trên df với window_size chỉ định
+def create_sliding_windows(df, window_size):
+    windows = []
+    for i in range(len(df) - window_size + 1):
+        window = df.iloc[i:i+window_size]
+        windows.append(window)
+    return windows
+
+def create_overlapping_windows(df_resampled, window_size, overlap_size):
+    step_size = window_size - overlap_size  # Kích thước bước giảm đi do chồng lấn
+    overlapping_windows = []
+    for i in range(0, len(df_resampled) - window_size + 1, step_size):
+        window = df_resampled[i:i + window_size]
+        overlapping_windows.append(window)
+    return overlapping_windows
+
+def create_paa_segments(df_resampled, num_segments):
+    paa = PiecewiseAggregateApproximation(n_segments=num_segments)
+    paa_values = paa.fit_transform([df_resampled['Close'].values])
+    return paa_values
+
+def create_variable_windows(df_resampled, min_size, max_size, step_size):
+    variable_windows = []
+    for size in range(min_size, max_size, step_size):  # Thử các kích thước cửa sổ khác nhau
+        windows = create_sliding_windows(df_resampled, size)
+        variable_windows.extend(windows)
+    return variable_windows
+
+def create_pyramid_windows(df_resampled, base_window_size, num_levels):
+    pyramid_windows = []
+    for level in range(num_levels):
+        window_size = base_window_size // (2 ** level)  # Tăng kích thước cửa sổ theo cấp độ
+        windows_at_level = create_sliding_windows(df_resampled, window_size)
+        pyramid_windows.extend(windows_at_level)
+    return pyramid_windows
+
+# Function 7A----------------------------------------------
+# Tính toán khoảng cách DTW cho từng đoạn trượt
+def compare_with_dtw(df_resampled, sliding_windows):
+    dtw_distances = []
+    for window in sliding_windows:
+        # Chuyển các chuỗi về dạng mảng numpy để tính DTW
+        resampled_values = df_resampled['Close'].values
+        window_values = window['Close'].values
+        
+        # Tính khoảng cách DTW
+        distance = dtw.distance(resampled_values, window_values)
+        dtw_distances.append(distance)
+    
+    return dtw_distances
+# Function 7B----------------------------------------------
+def compare_with_pmk(df_resampled, sliding_windows, num_levels=5):
+    pmk_distances = []
+    
+    # Chuyển cột 'Close' trong df_resampled thành chuỗi 1D
+    resampled_values = df_resampled['Close'].values
+    
+    for window in sliding_windows:
+        # Chuyển cột 'Close' trong mỗi window thành chuỗi 1D
+        window_values = window['Close'].values
+        
+        # Tính khoảng cách PMK giữa df_resampled và sliding window
+        distance = compute_pmk(resampled_values, window_values, num_levels=num_levels)
+        pmk_distances.append(distance)
+    
+    return pmk_distances
+
+def compute_pmk(ts_a, ts_b, num_levels=3):
+    total_distance = 0
+    
+    # Loop qua các cấp độ pyramid (từ chi tiết đến tổng quát)
+    for level in range(num_levels):
+        # Xác định kích thước bin (mức phân đoạn) cho cấp độ này
+        bin_size = 2 ** level
+        
+        # Tạo histogram cho mỗi chuỗi ở cấp độ này
+        hist_a = create_histogram(ts_a, bin_size)
+        hist_b = create_histogram(ts_b, bin_size)
+        
+        # Tính số điểm tương đồng ở cấp độ này
+        matches = np.minimum(hist_a, hist_b).sum()
+        
+        # Tính trọng số cho các điểm tương đồng ở cấp độ này (càng cao càng chi tiết)
+        total_distance += matches / bin_size
+    
+    return total_distance
+
+def create_histogram(ts, bin_size):
+    # Chia chuỗi thành các bins và đếm số lượng điểm trong mỗi bin
+    return np.histogram(ts, bins=np.arange(0, len(ts), bin_size))[0]
+
+# Function 8----------------------------------------------
+# Lựa chọn đoạn có khoảng cách DTW nhỏ nhất, và lấy chỉ số của slicing_windows tương ứng
+def find_best_match(dtw_distances, sliding_windows):
+    min_distance = min(dtw_distances)
+    best_match_index = dtw_distances.index(min_distance)
+    best_match_window = sliding_windows[best_match_index]
+    
+    return best_match_window, best_match_index, min_distance
+def find_worst_match(dtw_distances, sliding_windows):
+    max_distance = max(dtw_distances)
+    best_match_index = dtw_distances.index(max_distance)
+    best_match_window = sliding_windows[best_match_index]
+    
+    return best_match_window, best_match_index, max_distance
+
+# Function 9----------------------------------------------
+# 2 methos chuẩn hoá dữ liệu trước khi so sánh dtw
+# Giả sử df_resampled đã có các cột Open, High, Low, Close, Volume
+def normalize_min_max(df):
+    # Tạo một bản sao của df để không thay đổi dữ liệu gốc
+    df_normalized = df.copy()
+    # Chuẩn hóa các cột liên quan đến giá trị
+    scaler = MinMaxScaler()
+    df_normalized[['Open', 'High', 'Low', 'Close', 'Volume']] = scaler.fit_transform(df_normalized[['Open', 'High', 'Low', 'Close', 'Volume']])
+    # Trả về DataFrame đã chuẩn hóa
+    return df_normalized
+
+def normalize_z_score(df):
+    df_normalized = df.copy()
+    scaler = StandardScaler()
+    # Chỉ chuẩn hóa các cột liên quan đến giá trị
+    df_normalized[['Open', 'High', 'Low', 'Close', 'Volume']] = scaler.fit_transform(df_normalized[['Open', 'High', 'Low', 'Close', 'Volume']])
+    return df_normalized
 
 # Function 6----------------------------------------------
 # Hàm tính toán sự tương quan hoặc MSE giữa hai tuần

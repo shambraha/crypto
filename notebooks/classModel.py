@@ -9,9 +9,9 @@ from sklearn.metrics import confusion_matrix
 
 # class LSTM thuần chủng, chỉ là cấu trúc mô hình
 #... chưa có dùng [hàm kích hoạt] để xử lý đầu ra
-#region class LSTM----------------------------------------------------------------
-class LSTM(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, num_layers, ahead=1):
+#region class LSTM_Regression----------------------------------------------------------------
+class LSTM_Regression(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size, num_layers, ahead=1, dropout=0.0):
         """
         Class LSTM dùng chung cho cả bài toán phân loại và hồi quy.
         :param input_size: Số lượng đặc trưng đầu vào.
@@ -19,15 +19,20 @@ class LSTM(nn.Module):
         :param output_size: Số lượng lớp đầu ra (phân loại hoặc hồi quy).
         :param num_layers: Số lớp trong mạng LSTM.
         :param ahead: Số bước thời gian dự đoán (mặc định là 1).
+        :param dropout: Xác suất dropout để ngăn overfitting (mặc định là 0.0 nếu không có dropout).
         """
-        super(LSTM, self).__init__()
+        super(LSTM_Regression, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.ahead = ahead
         self.output_size = output_size
+        self.dropout_prob = dropout
+        
+        # LSTM layer với dropout giữa các layer nếu có nhiều hơn 1 layer
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout if num_layers > 1 else 0.0)
 
-        # LSTM layer
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        # Dropout layer trước fully connected layer
+        self.dropout = nn.Dropout(dropout)
 
         # Fully connected layer
         self.fc = nn.Linear(hidden_size, output_size * ahead)
@@ -40,14 +45,78 @@ class LSTM(nn.Module):
         # Forward pass through LSTM
         out, _ = self.lstm(x, (h0, c0))
 
+        # In kích thước sau LSTM
+        # print("Kích thước sau LSTM:", out.shape)
+
         # Get the output of the last time step
         out = out[:, -1, :]
+        # Lấy các bước thời gian cuối tương ứng với ahead
+        # out = out[:, -self.ahead:, :]
+
+        # Apply dropout
+        if self.dropout_prob > 0.0:
+            out = self.dropout(out)
 
         # Pass through fully connected layer
         out = self.fc(out)
 
-        return out    
-    
+        # Sửa output cho cả 2 trường hợp ahead
+        if self.ahead == 1:
+            out = out.squeeze()
+        else:
+            out = out.view(-1, self.ahead, self.output_size)
+            # Reshape output thành (batch_size, ahead, output_size)
+            # out = out.view(x.size(0), self.ahead, self.output_size)  # Sử dụng batch size gốc x.size(0)
+
+
+        return out     
+#endregion
+
+#region class LSTM Classification--------------------------------------------------
+class LSTMClassification(nn.Module):
+    def __init__(self, input_size, hidden_size, num_classes, num_layers, dropout=0.0):
+        """
+        Class LSTM cho bài toán phân loại.
+        :param input_size: Số lượng đặc trưng đầu vào.
+        :param hidden_size: Kích thước trạng thái ẩn.
+        :param num_classes: Số lượng lớp đầu ra (số nhãn trong bài toán phân loại).
+        :param num_layers: Số lớp trong mạng LSTM.
+        :param dropout: Xác suất dropout để ngăn overfitting (mặc định là 0.0 nếu không có dropout).
+        """
+        super(LSTMClassification, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.num_classes = num_classes
+        self.dropout_prob = dropout
+        
+        # LSTM layer với dropout giữa các layer nếu có nhiều hơn 1 layer
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout if num_layers > 1 else 0.0)
+
+        # Fully connected layer
+        self.fc = nn.Linear(hidden_size, num_classes)
+
+        # Dropout layer trước fully connected layer
+        # self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        # Initialize hidden and cell states
+        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
+        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
+
+        # Forward pass through LSTM
+        out, _ = self.lstm(x, (h0, c0))
+
+        # Get the output of the last time step
+        out = out[:, -1, :]  # Lấy giá trị từ bước thời gian cuối cùng
+
+        # Apply dropout
+        if self.dropout_prob > 0.0:
+            out = self.dropout(out)
+
+        # Pass through fully connected layer
+        out = self.fc(out)        
+        
+        return out  # Kích thước [batch_size, num_classes]
 #endregion
 
 #region MM_Regression--------------------------------------------------------------
@@ -69,13 +138,7 @@ class ModelManagerRegression:
         self.val_losses = []
         # self.train_accuracies = []
         # self.val_accuracies = []
-
-    def __repr__(self):
-        return (f"ModelManager(model={self.model.__class__.__name__}, "
-                f"lr={self.lr}, patience={self.patience}, "
-                f"criterion={self.criterion.__class__.__name__}, "
-                f"optimizer={self.optimizer.__class__.__name__})")
-    
+       
     def train(self, num_epochs, save_dir='.', scheduler=None):
         #1 Dòng này để lưu model
         os.makedirs(save_dir, exist_ok=True)
@@ -88,19 +151,39 @@ class ModelManagerRegression:
             self.model.train()  # Set the model to training mode
             total_train_loss = 0
 
-            for inputs, targets in self.train_loader:
+            for i, (inputs, targets) in enumerate(self.train_loader):
+                # In kích thước của inputs và targets
+                # print(f"Batch {i}: inputs shape: {inputs.shape}, targets shape: {targets.shape}")
+    
                 #2.1 Forward pass
                 outputs = self.model(inputs)  # outputs shape: [batch_size, ahead, output_size]
-
-                # Reshape the outputs for regression if needed (ahead=1)
-                outputs = outputs.view(-1, self.ahead, 1)  # Reshape to [batch_size, ahead, output_size]
-                # Note: if ahead=1, this won't change the shape, so it's safe for regression
+                # In kích thước của outputs
+                # print(f"Outputs shape: {outputs.shape}")
+                # # Reshape the outputs for regression nếu ahead > 1
+                # if self.ahead > 1:
+                #     outputs = outputs.view(-1, self.ahead, 1)  # Chỉ reshape khi ahead > 1
+                # else:
+                #     outputs = outputs.view(-1)  # Nếu ahead=1, giữ kích thước là [batch_size]
 
                 # Đảm bảo targets cũng có cùng shape
-                assert outputs.shape == targets.shape, f"Mismatch in shape: {outputs.shape} vs {targets.shape}"
+                # Hoặc để đảm bảo outputs có đúng kích thước, sử dụng view:
+                # outputs = outputs.view(-1)  # Đảm bảo outputs có kích thước [32]
+
+                #assert outputs.shape == targets.shape, f"Mismatch in shape: {outputs.shape} vs {targets.shape}"
+
+                # print("Outputs.shape after squeeze: ", outputs.shape)
+                # print("Targets.shape: ", targets.shape)
+
+                # In kích thước của outputs và targets trước khi tính loss
+                # print("Kích thước của outputs:", outputs.shape)
+                # print("Kích thước của targets:", targets.shape)
 
                 #2.2 Compute loss
+                # trường hợp ahead = 1
                 loss = self.criterion(outputs, targets)
+                # print(f"Loss at step {i}: {loss}")
+
+                #loss = self.criterion(outputs, targets)
                 total_train_loss += loss.item()
 
                 #2.3 Không có Compute accuracies
@@ -153,7 +236,7 @@ class ModelManagerRegression:
                 outputs = self.model(inputs)
 
                 # Reshape outputs nếu cần thiết cho bài toán multi-step
-                outputs = outputs.view(-1, self.ahead, 1)  # Điều chỉnh để phù hợp với targets nếu ahead > 1
+                # outputs = outputs.view(-1, self.ahead, 1)  # Điều chỉnh để phù hợp với targets nếu ahead > 1
 
                 # Tính toán loss
                 loss = self.criterion(outputs, targets)
@@ -237,6 +320,12 @@ class ModelManagerRegression:
                 plt.show()
                 plt.close()  # Close the plot to avoid overlapping in saved images
 
+    def __repr__(self):
+        return (f"ModelManager(model={self.model.__class__.__name__}, "
+                f"lr={self.lr}, patience={self.patience}, "
+                f"criterion={self.criterion.__class__.__name__}, "
+                f"optimizer={self.optimizer.__class__.__name__})")
+    
 #endregion MM_Regression
 
 #region MM_Classification----------------------------------------------------------
@@ -256,13 +345,7 @@ class ModelManagerClassification:
         self.val_losses = []
         self.train_accuracies = []
         self.val_accuracies = []
-
-    def __repr__(self):
-        return (f"ModelManager(model={self.model.__class__.__name__}, "
-                f"lr={self.lr}, patience={self.patience}, "
-                f"criterion={self.criterion.__class__.__name__}, "
-                f"optimizer={self.optimizer.__class__.__name__})")
-    
+   
     def train(self, num_epochs, save_dir='.', scheduler=None):
         #1 Dòng này để lưu model
         os.makedirs(save_dir, exist_ok=True)
@@ -282,7 +365,8 @@ class ModelManagerClassification:
                 outputs = self.model(inputs)  # outputs shape: [batch_size, num_classes]
                 # Apply softmax to get class probabilities 
                 # ... bởi vì ở class LSTM thuần, không xử lý output
-                outputs = torch.softmax(outputs, dim=1)  # [batch_size, num_classes]
+                # Không cần softmax, CrossEntropyLoss đã bao gồm log_softmax bên trong
+                # outputs = torch.softmax(outputs, dim=1)  # [batch_size, num_classes]
 
                 # Điều chỉnh targets nếu dùng CrossEntropyLoss
                 if isinstance(self.criterion, torch.nn.CrossEntropyLoss):
@@ -465,5 +549,11 @@ class ModelManagerClassification:
             plt.ylabel('True Label')
             plt.title('Confusion Matrix')
             plt.show()
+
+    def __repr__(self):
+        return (f"ModelManager(model={self.model.__class__.__name__}, "
+                f"lr={self.lr}, patience={self.patience}, "
+                f"criterion={self.criterion.__class__.__name__}, "
+                f"optimizer={self.optimizer.__class__.__name__})")
 
 #endergion MM_Classification

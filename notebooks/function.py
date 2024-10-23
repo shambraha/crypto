@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import talib
 import torch
+import torch.optim as optim
 
 # 1. Danh sách chỉ số kỹ thuật ---------------------------------------------
 # 1.1 Simple Moving Average (SMA)
@@ -175,3 +176,35 @@ def test_model_on_batch(lstm_upgrade_model, train_loader):
     # Kiểm tra kích thước và nội dung của đầu ra
     print(f"Kích thước đầu ra của mô hình: {outputs.shape}")
     print(f"Đầu ra của mô hình (outputs): {outputs}")
+
+# 5. Tạo optimizer và schedulers với thông số mặc định
+# Cách điều chỉnh: trong notion "Điều chỉnh các tham số optimizer"
+# scheduler_step_lr: sau mỗi [step_size] epoch, tốc độ học sẽ giảm xuống còn [step_size]*[gamma]
+# scheduler_reduce_lr: loss không cải thiện sau [patience] liên tiếp, thì giảm xuống [current_speech]*[]
+def create_optimizer_and_schedulers(model, lr=0.001, step_size=10, gamma=0.1, factor=0.1, patience=5):
+    """
+    Hàm khởi tạo optimizer và các scheduler cho model.
+
+    :param model: Mô hình cần tối ưu hóa.
+    :param lr: Tốc độ học ban đầu (learning rate).
+    :param step_size: Số bước trước khi giảm tốc độ học cho StepLR.
+    :param gamma: Hệ số giảm tốc độ học cho StepLR.
+    :param factor: Hệ số giảm tốc độ học cho ReduceLROnPlateau.
+    :param patience: Số epoch chờ đợi trước khi giảm tốc độ học cho ReduceLROnPlateau.
+    
+    :return: optimizer, scheduler_reduce_lr, scheduler_step_lr
+    """
+    # Khởi tạo optimizer Adam
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+
+    # Khởi tạo scheduler ReduceLROnPlateau
+    scheduler_reduce_lr = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=factor, patience=patience, verbose=True
+    )
+
+    # Khởi tạo scheduler StepLR
+    scheduler_step_lr = torch.optim.lr_scheduler.StepLR(
+        optimizer, step_size=step_size, gamma=gamma
+    )
+
+    return optimizer, scheduler_reduce_lr, scheduler_step_lr
