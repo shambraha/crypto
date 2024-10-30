@@ -26,7 +26,7 @@ from classML_upgrade import *
 # Cấu hình trang Streamlit
 st.set_page_config(layout="wide")
 
-# Hàm tính toán các chỉ báo kỹ thuật
+# Hàm (1) tính toán các chỉ báo kỹ thuật
 def calculate_indicators(df):
     df['SMA_10'] = calculate_sma(df, period=10)
     df['EMA_10'] = calculate_ema(df, period=10)
@@ -42,7 +42,7 @@ def calculate_indicators(df):
     df['SAR'] = calculate_sar(df, acceleration=0.02, maximum=0.2)
     return df
 
-# Hàm tải và chuẩn bị dữ liệu theo timeframe
+# Hàm (2) tải và chuẩn bị dữ liệu theo timeframe
 def load_and_prepare_data(file_path, timeframe='1h'):
     # Đọc dữ liệu
     df = pd.read_csv(file_path)
@@ -73,7 +73,7 @@ def load_and_prepare_data(file_path, timeframe='1h'):
     
     return df
 
-# Hàm tạo các cặp X-y làm đầu vào
+# Hàm (3) tạo các cặp X-y làm đầu vào
 def create_model_inputs(df, timesteps=168):
     X, y = [], []
 
@@ -86,7 +86,7 @@ def create_model_inputs(df, timesteps=168):
     X, y = np.array(X), np.array(y)
     return X, y
 
-# Hàm chia train, val, test
+# Hàm (4) chia train, val, test
 def split_data(X, y, train_ratio=0.85, val_ratio=0.1):
     train_size = int(train_ratio * len(X))
     val_size = int(val_ratio * len(X))
@@ -96,7 +96,7 @@ def split_data(X, y, train_ratio=0.85, val_ratio=0.1):
     X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=test_size, shuffle=False)
     return X_train, X_val, X_test, y_train, y_val, y_test
 
-# Dùng cho XGBoost và Random Forest
+# (5) Dùng cho XGBoost và Random Forest
 #.. chuyển đầu vào từ 3D (100, 168, 35) sang 2D (100, 168*35) 
 def reshape_for_ml(X_train, X_val, X_test):
     X_train = X_train.reshape(X_train.shape[0], -1)
@@ -104,7 +104,7 @@ def reshape_for_ml(X_train, X_val, X_test):
     X_test = X_test.reshape(X_test.shape[0], -1)
     return X_train, X_val, X_test
 
-# Hàm tổng Split Data
+# (6) Hàm tổng Split Data
 def split_data_and_reshape():
     # Chia dữ liệu
     X_train, X_val, X_test, y_train, y_val, y_test = split_data(st.session_state.X, st.session_state.y)
@@ -141,7 +141,7 @@ def split_data_and_reshape():
 st.title("Analyze Crypto using ML Model")
 #*********************************************************************************#
 
-# Phần Data ----------------------------------------------------------------------
+# A. Phần Data ----------------------------------------------------------------------
 # Lấy danh sách symbol từ local_folder
 available_symbols_local = extract_symbols_from_local_path(csv_folder_path)
 selected_symbol = st.sidebar.selectbox("Select Symbol", available_symbols_local)
@@ -196,7 +196,7 @@ if "shape_after_reshape" in st.session_state:
     st.write(f"X_val: {st.session_state.shape_after_reshape['X_val']}, y_val: {st.session_state.shape_after_reshape['y_val']}")
     st.write(f"X_test: {st.session_state.shape_after_reshape['X_test']}, y_test: {st.session_state.shape_after_reshape['y_test']}")
 
-# Phần Model ----------------------------------------------------------------------
+# B. Phần Model ----------------------------------------------------------------------
 # Khởi tạo biến session_state cho các biến cần thiết
 if "X_train" not in st.session_state:
     st.session_state.X_train = None
@@ -308,7 +308,7 @@ if st.session_state.model_manager is not None and st.button("Evaluate Model"):
 if "evaluation_results" in st.session_state:
     st.write("Evaluation Results:", st.session_state.evaluation_results)
 
-# Phần Trực quan hoá----------------------------------------------------------------
+# C. Phần Trực quan hoá----------------------------------------------------------------
 # Vẽ biểu đồ nến cho dữ liệu lịch sử
 def plot_candlestick(df):
     fig = go.Figure(data=[go.Candlestick(
