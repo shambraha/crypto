@@ -7,6 +7,7 @@ import time
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import joblib
@@ -133,7 +134,7 @@ def split_data(X, y, train_ratio=0.85, val_ratio=0.1):
     X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=test_size, shuffle=False)
     return X_train, X_val, X_test, y_train, y_val, y_test
 
-# (5) Dùng cho XGBoost và Random Forest
+# (5) CHỈ DÙNG CHO XGBoost và Random Forest
 #.. chuyển đầu vào từ 3D (100, 168, 35) sang 2D (100, 168*35) 
 # def reshape_for_ml(X_train, X_val, X_test):
 #     X_train = X_train.reshape(X_train.shape[0], -1)
@@ -170,7 +171,7 @@ def split_data_without_reshape():
    
 #*********************************************************************************#
 # Giao diện Streamlit
-st.title("Analyze Crypto using ML Model")
+st.title("Analyze Crypto using LSTM Model")
 #*********************************************************************************#
 
 # A. Phần Data ----------------------------------------------------------------------
@@ -180,6 +181,10 @@ available_symbols_local = extract_symbols_from_local_path(csv_folder_path)
 selected_symbol = st.sidebar.selectbox("Select Symbol", available_symbols_local)
 timeframe = st.sidebar.selectbox("Chọn timeframe:", ['1h', '4h', '1d', '1w'])
 timesteps = st.sidebar.number_input("Timesteps:", min_value=1, max_value=1000, value=168)
+
+# Lưu selected_symbol vào session_state nếu nó thay đổi
+if "selected_symbol" not in st.session_state or st.session_state.selected_symbol != selected_symbol:
+    st.session_state.selected_symbol = selected_symbol
 
 # Thêm output_size và ahead vào session_state nếu chưa tồn tại
 if "ahead" not in st.session_state:
@@ -213,10 +218,6 @@ if st.session_state.df is not None:
     st.write(st.session_state.df.shape)
     st.write(st.session_state.df)    
 
-# Cho phép người dùng chọn các cột đầu ra dự đoán
-# all_columns = list(st.session_state.df.columns[1:])  # Lấy tất cả các cột trừ 'Open Time'
-# target_columns = st.sidebar.multiselect("Chọn các cột đầu ra (phải bằng Output Size)", all_columns, default=all_columns[:st.session_state.output_size])
-
 # Kiểm tra nếu `st.session_state.df` đã được khởi tạo
 if "df" in st.session_state and st.session_state.df is not None:
     # Lấy tất cả các cột trừ 'Open Time'
@@ -242,18 +243,7 @@ else:
                                                     output_size=st.session_state.output_size,
                                                     ahead=st.session_state.ahead,
                                                     target_columns=target_columns)
-        
-# # Nút 2: Tạo đầu vào cho mô hình
-# if st.session_state.df is not None and st.button("Create Model Inputs"):
-#     # st.session_state.X, st.session_state.y =            create_model_inputs(st.session_state.df, timesteps)
-#     # st.session_state.X, st.session_state.y = create_model_inputs_with_ahead(st.session_state.df, timesteps, st.session_state.ahead)
-#     output_size = st.session_state.output_size # con số phải tương ứng với số lượng cột trong target_columns
-#     target_columns = ['Close', 'Volume', 'High']
-#     st.session_state.X, st.session_state.y = create_model_inputs_with_ahead_and_outputSize(
-#                                                     st.session_state.df, timesteps,
-#                                                     output_size=output_size,
-#                                                     ahead=st.session_state.ahead,
-#                                                     target_columns=target_columns)
+     
 
 # Hiển thị X và y sau khi tạo đầu vào cho mô hình
 if st.session_state.X is not None and st.session_state.y is not None:
@@ -302,6 +292,9 @@ if "evaluation_results" not in st.session_state:
 st.sidebar.subheader("B. Cấu hình Mô hình LSTM")
 # Chọn loại mô hình và loại bài toán
 task_type = st.sidebar.selectbox("Chọn loại bài toán:", ["regression", "classification"])
+# Cập nhật task_type vào session_state
+if "task_type" not in st.session_state or st.session_state.task_type != task_type:
+    st.session_state.task_type = task_type
 
 # Nhập và Lưu các tham số mô hình LSTM vào session_state
 if "hidden_size" not in st.session_state:
@@ -324,9 +317,7 @@ else:
     st.session_state.num_classes = None  # Đặt None khi không phải bài toán classification
 
 
-
-
-# Nút khởi tạo và hiển thị mô hình LSTM khi nhấn nút Initialize Model
+# Nút 4: Khởi tạo và hiển thị mô hình LSTM khi nhấn nút Initialize Model
 if st.button("Initialize Model"):
     # Khởi tạo mô hình LSTM
     input_size = st.session_state.X_train.shape[2] if st.session_state.X_train is not None else None
@@ -384,15 +375,141 @@ if st.button("Initialize Model"):
 if "model_summary" in st.session_state:
     st.markdown(st.session_state.model_summary)
 
+# Chạy dữ liệu qua mô hình một lần với một batch dữ liệu nhỏ và hiển thị kết quả đầu ra..
+# ..giúp chúng ta xác nhận rằng các cài đặt và kiến trúc mô hình phù hợp trước khi thực hiện huấn luyện chính thức 
+def demo_train_step(model, X_sample, y_sample):
+        model.eval()  # Đặt mô hình ở chế độ đánh giá (evaluation mode) cho demo
+        with torch.no_grad():  # Tắt tính năng tính gradient
+            y_pred = model(X_sample)
+        return y_pred, y_sample
+
+# Nút 5: Thực hiện train demo với 1 batch nhỏ
+if "model_summary" in st.session_state and st.button("Demo Train"):
+    # Kiểm tra nếu X_train và y_train đã được khởi tạo
+    if st.session_state.X_train is not None and st.session_state.y_train is not None:
+        # Chọn một sample từ dữ liệu huấn luyện
+        X_sample = st.session_state.X_train[:1]  # Lấy một batch nhỏ (ở đây là batch size = 1)
+        y_sample = st.session_state.y_train[:1]
+        
+        # Đưa dữ liệu vào mô hình và chạy demo train
+        y_pred, y_sample = demo_train_step(st.session_state.model_manager.model, X_sample, y_sample)
+        
+        # Hiển thị kết quả
+        st.write("Đầu ra của mô hình (y_pred):", y_pred)
+        st.write("Giá trị thực tế (y_sample):", y_sample)
+    else:
+        st.warning("Cần chuẩn bị dữ liệu trước khi thực hiện demo train.")
+
+
 # C. Phần Huấn luyện ----------------------------------------------------------------------
-st.sidebar.subheader("C. Training")
-# Lưu các tham số num_epochs và batch_size vào session_state
+st.sidebar.subheader("C. Training Parameters")
+
 if "num_epochs" not in st.session_state:
-    st.session_state.num_epochs = 100
-st.session_state.num_epochs = st.sidebar.number_input("Number of Epochs", min_value=1, max_value=500, value=st.session_state.num_epochs, step=1)
+    st.session_state.num_epochs = 100  # Số epoch mặc định
+st.session_state.num_epochs = st.sidebar.number_input("Number of Epochs", min_value=1, max_value=1000, value=st.session_state.num_epochs)
 if "batch_size" not in st.session_state:
-    st.session_state.batch_size = 32
-st.session_state.batch_size = st.sidebar.number_input("Batch Size", min_value=1, max_value=128, value=st.session_state.batch_size, step=1)
+    st.session_state.batch_size = 32  # Kích thước batch mặc định
+st.session_state.batch_size = st.sidebar.number_input("Batch Size", min_value=1, max_value=128, value=st.session_state.batch_size)
+
+# Khởi tạo cờ trong session_state nếu chưa có
+if "training_complete" not in st.session_state:
+    st.session_state.training_complete = False
+
+# Hàm vẽ lịch sử huấn luyện cho hồi quy
+def plot_regression_history(history):
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.plot(history["train_loss"], label="Train Loss")
+    ax.plot(history["val_loss"], label="Validation Loss")
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("Loss")
+    ax.set_title("Regression Training History")
+    ax.legend()
+    st.pyplot(fig)
+
+# Hàm vẽ lịch sử huấn luyện cho phân loại
+def plot_classification_history(history):
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+
+    # Vẽ Loss trên ax1
+    ax1.plot(history["train_loss"], label="Train Loss")
+    ax1.plot(history["val_loss"], label="Validation Loss")
+    ax1.set_xlabel("Epoch")
+    ax1.set_ylabel("Loss")
+    ax1.set_title("Classification Loss History")
+    ax1.legend()
+
+    # Vẽ Accuracy trên ax2
+    ax2.plot(history["train_accuracy"], label="Train Accuracy")
+    ax2.plot(history["val_accuracy"], label="Validation Accuracy")
+    ax2.set_xlabel("Epoch")
+    ax2.set_ylabel("Accuracy")
+    ax2.set_title("Classification Accuracy History")
+    ax2.legend()
+
+    st.pyplot(fig)
+
+# Hàm huấn luyện đầy đủ
+def train_model():
+    # Kiểm tra nếu mô hình và dữ liệu đã sẵn sàng
+    if st.session_state.model_manager and st.session_state.X_train is not None and st.session_state.y_train is not None:
+        # Chuyển đổi dữ liệu sang DataLoader để huấn luyện theo batch
+        train_data = torch.utils.data.TensorDataset(st.session_state.X_train, st.session_state.y_train)
+        train_loader = torch.utils.data.DataLoader(train_data, batch_size=st.session_state.batch_size, shuffle=True)
+        
+        val_data = torch.utils.data.TensorDataset(st.session_state.X_val, st.session_state.y_val)
+        val_loader = torch.utils.data.DataLoader(val_data, batch_size=st.session_state.batch_size, shuffle=False)
+
+        # Thiết lập thanh tiến trình và thông báo trạng thái
+        progress_bar = st.progress(0)
+        status_text = st.empty()  
+        epoch_status = st.empty()
+
+        # Bên trong hàm huấn luyện
+        for epoch in range(st.session_state.num_epochs):
+            st.session_state.model_manager.train(train_loader, val_loader, epochs=1)
+            train_loss = st.session_state.model_manager.history["train_loss"][-1]
+            val_loss = st.session_state.model_manager.history["val_loss"][-1]
+
+            # Cập nhật trạng thái epoch duy nhất
+            epoch_status.text(f"Epoch {epoch + 1}/{st.session_state.num_epochs}: Train Loss = {train_loss:.4f}, Val Loss = {val_loss:.4f}")
+            progress_bar.progress((epoch + 1) / st.session_state.num_epochs)
+         
+        # Sau khi hoàn tất huấn luyện
+        st.success("Training complete!")
+        
+        # Gọi hàm vẽ tương ứng dựa trên session_state.task_type
+        if st.session_state.task_type == "regression":
+            plot_regression_history(st.session_state.model_manager.history)
+        elif st.session_state.task_type == "classification":
+            plot_classification_history(st.session_state.model_manager.history)          
+
+        # Đặt cờ hoàn thành huấn luyện
+        st.session_state.training_complete = True
+    else:
+        st.warning("Cần khởi tạo mô hình và dữ liệu trước khi huấn luyện!")
+
+# Nút 6: Bắt đầu huấn luyện thực sự với tham số num_epochs và batch_size
+if st.button("Start Training"):
+    train_model()
+
+# Chỉ hiển thị các nút Save và Load khi training_complete là True
+if st.session_state.training_complete:
+    # Sử dụng selected_symbol trong đường dẫn model_path
+    model_path = st.sidebar.text_input("Model Path", value=f"modelsML/{st.session_state.selected_symbol}.pth")
+
+    if st.button("Save Model"):
+        if model_path:
+            st.session_state.model_manager.save_model(model_path)
+            st.success(f"Model saved successfully at {model_path}!")
+        else:
+            st.warning("Please enter a valid model path.")
+
+    if st.button("Load Model"):
+        if model_path:
+            st.session_state.model_manager.load_model(model_path)
+            st.success(f"Model loaded successfully from {model_path}!")
+        else:
+            st.warning("Please enter a valid model path.")
 
 # D. readme.md
 # Khi bạn nạp dữ liệu vào mô hình LSTM, kích thước của các tensor đầu vào nên như sau:

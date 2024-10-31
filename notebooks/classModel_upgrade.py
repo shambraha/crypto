@@ -126,6 +126,10 @@ class BaseModelManager(ABC):
         self.scheduler = scheduler
         self.history = {"train_loss": [], "val_loss": []}
 
+        # Kiểm tra và đặt thiết bị (CPU hoặc GPU)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model.to(self.device)  # Đưa mô hình về thiết bị này
+
     @abstractmethod
     def train(self, *args, **kwargs):
         pass  # Phương thức train sẽ được triển khai riêng trong lớp con
@@ -179,7 +183,8 @@ class ModelManagerRegression(BaseModelManager):
             self.model.train()
             train_loss = 0.0
             for X_batch, y_batch in train_loader:
-                X_batch, y_batch = X_batch.to(self.model.device), y_batch.to(self.model.device)
+                # X_batch, y_batch = X_batch.to(self.model.device), y_batch.to(self.model.device)
+                X_batch, y_batch = X_batch.to(self.device), y_batch.to(self.device)
                 
                 self.optimizer.zero_grad()
                 y_pred = self.model(X_batch)
@@ -217,7 +222,8 @@ class ModelManagerRegression(BaseModelManager):
         total_loss = 0.0
         with torch.no_grad():
             for X_batch, y_batch in data_loader:
-                X_batch, y_batch = X_batch.to(self.model.device), y_batch.to(self.model.device)
+                # X_batch, y_batch = X_batch.to(self.model.device), y_batch.to(self.model.device)
+                X_batch, y_batch = X_batch.to(self.device), y_batch.to(self.device)
                 y_pred = self.model(X_batch)
 
                 # Điều chỉnh kích thước của y_pred nếu cần thiết để khớp với y_batch
@@ -229,6 +235,31 @@ class ModelManagerRegression(BaseModelManager):
                 total_loss += loss.item()
         
         return total_loss / len(data_loader)
+    
+    # def plot_training_history(self):
+    #     # Tạo figure và ax mới từ subplots
+    #     fig, ax = plt.subplots(figsize=(10, 5))
+        
+    #     # Vẽ toàn bộ biểu đồ trên ax, tránh lệnh plt.plot()
+    #     ax.plot(self.history["train_loss"], label="Train Loss")
+    #     ax.plot(self.history["val_loss"], label="Validation Loss")
+    #     ax.set_xlabel("Epoch")
+    #     ax.set_ylabel("Loss")
+    #     ax.set_title("Regression Training History")
+    #     ax.legend()
+
+    #     # Trả về fig (figure) thay vì plt
+    #     return fig
+    
+    # def plot_training_history(self):
+    #     fig, ax = plt.subplots(figsize=(10, 5))
+    #     ax.plot(self.history["train_loss"], label="Train Loss")
+    #     ax.plot(self.history["val_loss"], label="Validation Loss")
+    #     ax.set_xlabel("Epoch")
+    #     ax.set_ylabel("Loss")
+    #     ax.set_title("Regression Training History")
+    #     ax.legend()
+    #     return fig
 
 # class ModelManagerRegression(BaseModelManager):
 #     def train(self, train_loader, val_loader, epochs=100, patience=10):
@@ -340,7 +371,8 @@ class ModelManagerClassification(BaseModelManager):
             self.model.train()
             train_loss = 0.0
             for X_batch, y_batch in train_loader:
-                X_batch, y_batch = X_batch.to(self.model.device), y_batch.to(self.model.device)
+                # X_batch, y_batch = X_batch.to(self.model.device), y_batch.to(self.model.device)
+                X_batch, y_batch = X_batch.to(self.device), y_batch.to(self.device)
                 
                 self.optimizer.zero_grad()
                 y_pred = self.model(X_batch)
@@ -376,7 +408,8 @@ class ModelManagerClassification(BaseModelManager):
         
         with torch.no_grad():
             for X_batch, y_batch in data_loader:
-                X_batch, y_batch = X_batch.to(self.model.device), y_batch.to(self.model.device)
+                # X_batch, y_batch = X_batch.to(self.model.device), y_batch.to(self.model.device)
+                X_batch, y_batch = X_batch.to(self.device), y_batch.to(self.device)
                 outputs = self.model(X_batch)
                 loss = self.criterion(outputs, y_batch)
                 total_loss += loss.item()
