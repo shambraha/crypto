@@ -8,6 +8,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import joblib
@@ -168,7 +169,62 @@ def split_data_without_reshape():
         "y_val": y_val.shape,
         "y_test": y_test.shape
     }
-   
+
+# def normalize_data(X_train, X_val, X_test, normalization_type):
+#     if normalization_type == "Min-Max Scaling":
+#         scaler = MinMaxScaler()
+#     elif normalization_type == "Z-score Normalization":
+#         scaler = StandardScaler()
+#     else:
+#         return X_train, X_val, X_test  # Không chuẩn hóa
+    
+#     # Chuẩn hóa dữ liệu train
+#     X_train_scaled = scaler.fit_transform(X_train.reshape(-1, X_train.shape[-1])).reshape(X_train.shape)
+    
+#     # Áp dụng scaler lên dữ liệu val và test
+#     X_val_scaled = scaler.transform(X_val.reshape(-1, X_val.shape[-1])).reshape(X_val.shape)
+#     X_test_scaled = scaler.transform(X_test.reshape(-1, X_test.shape[-1])).reshape(X_test.shape)
+    
+#     return X_train_scaled, X_val_scaled, X_test_scaled
+
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+
+# def normalize_data(X, y, normalization_type):
+#     if normalization_type == "Min-Max Scaling":
+#         x_scaler = MinMaxScaler()
+#         y_scaler = MinMaxScaler()
+#     elif normalization_type == "Z-score Normalization":
+#         x_scaler = StandardScaler()
+#         y_scaler = StandardScaler()
+#     else:
+#         return X, y  # Không chuẩn hóa
+    
+#     # Chuẩn hóa X
+#     X_scaled = x_scaler.fit_transform(X.reshape(-1, X.shape[-1])).reshape(X.shape)
+    
+#     # Chuẩn hóa y
+#     y_scaled = y_scaler.fit_transform(y.reshape(-1, y.shape[-1])).reshape(y.shape)
+    
+#     return X_scaled, y_scaled, x_scaler, y_scaler  # Trả về scaler để dùng cho giải chuẩn hóa nếu cần
+
+def normalize_data(X, y, normalization_type):
+    if normalization_type == "Min-Max Scaling":
+        x_scaler = MinMaxScaler()
+        y_scaler = MinMaxScaler()
+    elif normalization_type == "Z-score Normalization":
+        x_scaler = StandardScaler()
+        y_scaler = StandardScaler()
+    else:
+        return X, y  # Không chuẩn hóa
+
+    # Chuẩn hóa X và giữ kích thước 3 chiều
+    X_scaled = x_scaler.fit_transform(X.reshape(-1, X.shape[-1])).reshape(X.shape)
+    
+    # Chuẩn hóa y và giữ kích thước 3 chiều
+    y_scaled = y_scaler.fit_transform(y.reshape(-1, y.shape[-1])).reshape(y.shape)
+    
+    return X_scaled, y_scaled, x_scaler, y_scaler
+
 #*********************************************************************************#
 # Giao diện Streamlit
 st.title("Analyze Crypto using LSTM Model")
@@ -193,7 +249,7 @@ st.session_state.ahead = st.sidebar.number_input("Steps Ahead", min_value=1, max
 if "output_size" not in st.session_state:
     st.session_state.output_size = 1  # Giá trị mặc định cho hồi quy
 st.session_state.output_size = st.sidebar.number_input("Output Size (PHẢI chọn cột features tương ứng ở Nút 2 - Line 220)",
-                                                    min_value=1, max_value=10,
+                                                    min_value=1, max_value=50,
                                                     value=st.session_state.output_size)
 
 # Tạo đường dẫn đến file dữ liệu
@@ -209,7 +265,7 @@ if 'y' not in st.session_state:
     st.session_state.y = None
 
 # Nút 1: Tải và xử lý dữ liệu
-if st.button("Add Indicators to Data"):
+if st.button("A.1 Add Indicators to Data"):
     st.session_state.df = load_and_prepare_data(file_path, st.session_state.timeframe)
 
 # Hiển thị bảng `df` nếu đã được tải
@@ -232,26 +288,60 @@ else:
     st.warning("Cần tải dữ liệu trước khi chọn các cột đầu ra.")
     target_columns = []
 
+
+
+
+# # Nút Normalize Data
+# if st.sidebar.button("Normalize Data"):
+#     if normalization_type != "None":
+#         X_train, X_val, X_test = normalize_data(X_train, X_val, X_test, normalization_type)
+#         st.success(f"Data normalized using {normalization_type}")
+#     else:
+#         st.warning("Please select a normalization type before proceeding.")
+
+
 # Kiểm tra số lượng cột đầu ra
 if len(target_columns) != st.session_state.output_size:
     st.warning(f"Output Size ({st.session_state.output_size}) và số lượng cột đầu ra ({len(target_columns)}) phải khớp.")
 else:
     # Nút 2: Tạo đầu vào cho mô hình
-    if st.session_state.df is not None and st.button("Create Model Inputs"):
+    if st.session_state.df is not None and st.button("A.2 Create Model Inputs"):
         st.session_state.X, st.session_state.y = create_model_inputs_with_ahead_and_outputSize(
                                                     st.session_state.df, timesteps,
                                                     output_size=st.session_state.output_size,
                                                     ahead=st.session_state.ahead,
                                                     target_columns=target_columns)
-     
 
 # Hiển thị X và y sau khi tạo đầu vào cho mô hình
 if st.session_state.X is not None and st.session_state.y is not None:
     st.write(f"Kích thước của X: {st.session_state.X.shape}")
     st.write(f"Kích thước của y: {st.session_state.y.shape}")
 
+# Thêm tùy chọn Normalization trong Sidebar
+st.sidebar.subheader("Data Normalization")
+normalization_type = st.sidebar.selectbox(
+    "Select Normalization Type",
+    options=["None", "Min-Max Scaling", "Z-score Normalization"]
+)
+
+def normalize_and_update_state(normalization_type):
+    if normalization_type != "None":
+        # Thực hiện chuẩn hóa khi có lựa chọn kiểu normalize
+        st.session_state.X, st.session_state.y, st.session_state.x_scaler, st.session_state.y_scaler = normalize_data(
+            st.session_state.X, st.session_state.y, normalization_type
+        )
+        st.success(f"Data normalized using {normalization_type}")
+    else:
+        # Nếu không chọn kiểu normalize, tiếp tục mà không chuẩn hóa
+        st.info("Proceeding without normalization.")
+
+# Nút Normalize
+if st.button("A.3 Normalize"):
+    normalize_and_update_state(normalization_type)
+
+
 # Nút 3: Chia dữ liệu
-if st.session_state.X is not None and st.session_state.y is not None and st.button("Split Data"):
+if st.session_state.X is not None and st.session_state.y is not None and st.button("A.4 Split Data"):
     split_data_without_reshape()
     
 # Hiển thị kích thước without reshape ở ngoài phần xử lý của nút
@@ -308,7 +398,7 @@ if "dropout_rate" not in st.session_state:
 st.session_state.dropout_rate = st.sidebar.slider("Dropout Rate", 0.0, 0.5, st.session_state.dropout_rate)
 if "learning_rate" not in st.session_state:
     st.session_state.learning_rate = 0.001
-st.session_state.learning_rate = st.sidebar.number_input("Learning Rate", min_value=0.0001, max_value=0.01, value=st.session_state.learning_rate, step=0.0001, format="%.4f")
+st.session_state.learning_rate = st.sidebar.number_input("Learning Rate", min_value=0.0001, max_value=0.05, value=st.session_state.learning_rate, step=0.0001, format="%.4f")
 
 # Nếu là bài toán classification, hiển thị num_classes với key duy nhất
 if task_type == "classification":
@@ -318,7 +408,7 @@ else:
 
 
 # Nút 4: Khởi tạo và hiển thị mô hình LSTM khi nhấn nút Initialize Model
-if st.button("Initialize Model"):
+if st.button("B.1 Initialize Model"):
     # Khởi tạo mô hình LSTM
     input_size = st.session_state.X_train.shape[2] if st.session_state.X_train is not None else None
     if input_size is None:
@@ -384,7 +474,7 @@ def demo_train_step(model, X_sample, y_sample):
         return y_pred, y_sample
 
 # Nút 5: Thực hiện train demo với 1 batch nhỏ
-if "model_summary" in st.session_state and st.button("Demo Train"):
+if "model_summary" in st.session_state and st.button("B.2 Demo Train"):
     # Kiểm tra nếu X_train và y_train đã được khởi tạo
     if st.session_state.X_train is not None and st.session_state.y_train is not None:
         # Chọn một sample từ dữ liệu huấn luyện
@@ -406,7 +496,7 @@ st.sidebar.subheader("C. Training Parameters")
 
 if "num_epochs" not in st.session_state:
     st.session_state.num_epochs = 100  # Số epoch mặc định
-st.session_state.num_epochs = st.sidebar.number_input("Number of Epochs", min_value=1, max_value=1000, value=st.session_state.num_epochs)
+st.session_state.num_epochs = st.sidebar.number_input("Number of Epochs", min_value=1, max_value=10000, value=st.session_state.num_epochs)
 if "batch_size" not in st.session_state:
     st.session_state.batch_size = 32  # Kích thước batch mặc định
 st.session_state.batch_size = st.sidebar.number_input("Batch Size", min_value=1, max_value=128, value=st.session_state.batch_size)
@@ -489,27 +579,337 @@ def train_model():
         st.warning("Cần khởi tạo mô hình và dữ liệu trước khi huấn luyện!")
 
 # Nút 6: Bắt đầu huấn luyện thực sự với tham số num_epochs và batch_size
-if st.button("Start Training"):
+if st.button("C.1 Start Training"):
     train_model()
 
 # Chỉ hiển thị các nút Save và Load khi training_complete là True
 if st.session_state.training_complete:
     # Sử dụng selected_symbol trong đường dẫn model_path
     model_path = st.sidebar.text_input("Model Path", value=f"modelsML/{st.session_state.selected_symbol}.pth")
+    # Cập nhật learning rate mới từ sidebar
+    new_learning_rate = st.sidebar.number_input("New Learning Rate for Fine-tuning", min_value=0.0001, max_value=0.1, step=0.001, format="%.4f")
 
-    if st.button("Save Model"):
+    if st.button("C.2 Save Model (rememberCheck Model Path)"):
         if model_path:
             st.session_state.model_manager.save_model(model_path)
             st.success(f"Model saved successfully at {model_path}!")
         else:
             st.warning("Please enter a valid model path.")
 
-    if st.button("Load Model"):
+    if st.button("C.3 Load Model (rememberCheck new_learning_rate)"):
         if model_path:
             st.session_state.model_manager.load_model(model_path)
             st.success(f"Model loaded successfully from {model_path}!")
+
+            # Thiết lập optimizer với learning rate mới
+            for param_group in st.session_state.model_manager.optimizer.param_groups:
+                param_group['lr'] = new_learning_rate
+
+            st.write(f"Updated learning rate to {new_learning_rate}")
         else:
             st.warning("Please enter a valid model path.")
+
+# D. Phần Đánh giá ----------------------------------------------------------------------
+# Thêm lựa chọn loại dữ liệu đánh giá
+st.sidebar.subheader("D. Evaluation Options")
+evaluation_option = st.sidebar.selectbox(
+    "Select Evaluation Type",
+    options=["Test Dataset", "Validation Dataset", "Forecast n Steps Ahead"]
+)
+
+# Nếu chọn Forecast, cho phép chọn n bước thời gian tiếp theo
+n_steps = 0
+if evaluation_option == "Forecast n Steps Ahead":
+    n_steps = st.sidebar.number_input("Number of Steps Ahead to Forecast", min_value=1, max_value=100, value=10)
+   
+# Hàm dự đoán và trả về [predictions, true_values] để thực hiện vẽ biểu đồ
+def evaluate_and_predict(evaluation_option, model_manager, n_steps=0):
+    model_manager.model.eval()
+    predictions, true_values = None, None
+    steps_ahead = st.session_state.ahead  # Sử dụng bước ahead từ session state
+    
+    with torch.no_grad():
+        if evaluation_option == "Test Dataset":
+            X_data = st.session_state.X_test
+            y_data = st.session_state.y_test
+            predictions = model_manager.model(X_data).cpu().numpy()
+            true_values = y_data.cpu().numpy()
+
+        elif evaluation_option == "Validation Dataset":
+            X_data = st.session_state.X_val
+            y_data = st.session_state.y_val
+            predictions = model_manager.model(X_data).cpu().numpy()
+            true_values = y_data.cpu().numpy()
+
+        # Phần này viết lại sau
+        # elif evaluation_option == "Forecast n Steps Ahead":
+        #     # Lấy dữ liệu gần nhất để dự báo
+        #     X_last = st.session_state.X_test[-1:]  # Dùng sample cuối cùng của tập test để dự đoán n bước
+        #     predictions = []
+        #     for _ in range(n_steps):
+        #         y_pred = model_manager.model(X_last)
+        #         predictions.append(y_pred.cpu().numpy())
+                
+        #         # Cập nhật X_last để tiếp tục dự đoán cho bước tiếp theo
+        #         X_last = torch.cat((X_last[:, 1:, :], y_pred.unsqueeze(1)), dim=1)
+
+        #     predictions = np.array(predictions).squeeze()
+        elif evaluation_option == "Forecast n Steps Ahead":
+            # Dùng mẫu cuối cùng của X_test để bắt đầu dự báo
+            X_last = st.session_state.X_test[-1:].clone()  # Giữ nguyên kích thước (1, 7, 34) cho đầu vào
+            predictions = []
+            steps_to_predict = n_steps
+
+            while steps_to_predict > 0:
+                # Dự báo cho số bước tiếp theo (steps_ahead)
+                y_pred = model_manager.model(X_last)  # Kích thước (1, steps_ahead, 34)
+                y_pred_np = y_pred.cpu().numpy().squeeze()  # Chuyển sang NumPy và bỏ kích thước không cần thiết
+                
+                # Lưu y_pred cho mỗi bước
+                predictions.append(y_pred_np)
+                
+                # Cập nhật X_last: lấy steps_ahead bước cuối cùng làm đầu vào mới
+                # Nếu còn ít hơn steps_ahead bước để dự đoán, chỉ lấy phần cần thiết
+                if steps_to_predict >= steps_ahead:
+                    X_last = torch.cat((X_last[:, steps_ahead:, :], y_pred), dim=1)  # Giữ lại 7 bước
+                else:
+                    X_last = torch.cat((X_last[:, steps_ahead:, :], y_pred[:, :steps_to_predict, :]), dim=1)
+                
+                # Giảm số bước còn lại cần dự báo
+                steps_to_predict -= steps_ahead
+            
+            # Chuyển predictions thành mảng NumPy
+            predictions = np.concatenate(predictions[:n_steps], axis=0)  # Kích thước (n_steps, 34)
+
+    return predictions, true_values
+
+# Hàm vẽ kết quả cho Test Dataset và Validation Dataset với Plotly
+def plot_test_validation_results(true_values, predictions, evaluation_option, selected_features, step_ahead):
+    fig = go.Figure()
+
+    for i, feature in enumerate(selected_features):
+        # Thêm đường True Value cho mỗi đặc trưng
+        fig.add_trace(go.Scatter(
+            x=list(range(true_values.shape[0])),
+            y=true_values[:, step_ahead, i],  # Sử dụng step_ahead đã chọn
+            mode='lines',
+            name=f"True {feature} - Step {step_ahead + 1}",
+            hoverinfo="y"
+        ))
+
+        # Thêm đường Predicted Value cho mỗi đặc trưng
+        fig.add_trace(go.Scatter(
+            x=list(range(predictions.shape[0])),
+            y=predictions[:, step_ahead, i],  # Sử dụng step_ahead đã chọn
+            mode='lines',
+            name=f"Predicted {feature} - Step {step_ahead + 1}",
+            line=dict(dash='dash'),
+            hoverinfo="y"
+        ))
+
+    # Cài đặt tiêu đề và trục
+    fig.update_layout(
+        title=f"{evaluation_option} - Step {step_ahead + 1} Ahead Prediction",
+        xaxis_title="Time",
+        yaxis_title="Value",
+        legend_title="Legend",
+        hovermode="x"
+    )
+
+    # Hiển thị biểu đồ trong Streamlit
+    st.plotly_chart(fig)
+
+
+# Hàm vẽ kết quả cho Forecast n Steps Ahead
+# def plot_forecast_results(predictions, n_steps):
+#     fig, ax = plt.subplots(figsize=(12, 6))
+#     for feature in range(34):  # Hoặc chỉ chọn các feature quan trọng để dễ xem hơn
+#         ax.plot(range(len(predictions)), predictions[:, feature], linestyle='--', label=f"Predicted Feature {feature+1}")
+#     ax.set_title(f"Forecast {n_steps} Steps Ahead")
+#     ax.set_xlabel("Future Steps")
+#     ax.set_ylabel("Predicted Values")
+#     ax.legend(loc="upper right", bbox_to_anchor=(1.15, 1))
+#     st.pyplot(fig)
+# Hàm vẽ kết quả cho Forecast n Steps Ahead
+
+# def plot_forecast_results(predictions, n_steps, selected_features):
+#     fig = go.Figure()
+
+#     for i, feature in enumerate(selected_features):
+#         fig.add_trace(go.Scatter(
+#             x=list(range(n_steps)),
+#             y=predictions[:n_steps, i],  # Dữ liệu dự báo cho từng đặc trưng
+#             mode='lines',
+#             name=f"Predicted {feature}",
+#             hoverinfo="y"
+#         ))
+
+#     fig.update_layout(
+#         title=f"Forecast {n_steps} Steps Ahead",
+#         xaxis_title="Future Steps",
+#         yaxis_title="Predicted Values",
+#         legend_title="Legend",
+#         hovermode="x"
+#     )
+
+#     st.plotly_chart(fig)
+
+import plotly.graph_objects as go
+
+# Hàm vẽ kết quả cho Forecast n Steps Ahead với dữ liệu X_last
+def plot_forecast_results(X_last, predictions, n_steps, selected_features):
+    fig = go.Figure()
+
+    # Thêm dữ liệu X_last vào biểu đồ
+    X_last_len = X_last.shape[1]  # Số bước trong X_last
+
+    for i, feature in enumerate(selected_features):
+        # Hiển thị X_last (dữ liệu ban đầu)
+        fig.add_trace(go.Scatter(
+            x=list(range(X_last_len)),
+            # y=X_last[0, :, i].cpu().numpy(),  # Chuyển đổi tensor X_last thành numpy array
+            y=X_last[0, :, i],  # Không cần gọi `.cpu()` nếu đã là numpy array
+            mode='lines',
+            name=f"Initial {feature}",
+            hoverinfo="y",
+            line=dict(color='blue')
+        ))
+
+        # Hiển thị dự báo tiếp theo cho feature
+        fig.add_trace(go.Scatter(
+            x=list(range(X_last_len, X_last_len + n_steps)),
+            y=predictions[:n_steps, i],  # Dữ liệu dự báo cho từng đặc trưng
+            mode='lines',
+            name=f"Predicted {feature}",
+            hoverinfo="y",
+            line=dict(dash='dash', color='red')
+        ))
+
+    fig.update_layout(
+        title=f"Forecast {n_steps} Steps Ahead with Initial Data",
+        xaxis_title="Time",
+        yaxis_title="Values",
+        legend_title="Legend",
+        hovermode="x"
+    )
+
+    st.plotly_chart(fig)
+
+
+# Lựa chọn đặc trưng trong sidebar
+selected_features = st.sidebar.multiselect(
+    "Select Features to Display",
+    options=[f"Feature {i+1}" for i in range(34)],
+    default=["Feature 1", "Feature 2", "Feature 3"]  # Chọn mặc định một số đặc trưng quan trọng
+)
+# Thanh trượt chọn step ahead
+# step_ahead = st.sidebar.slider("Select Step Ahead", min_value=1, max_value=st.session_state.ahead, value=1) - 1  # Trừ 1 để dùng làm chỉ số
+# Kiểm tra nếu ahead lớn hơn 1 thì mới hiển thị thanh trượt
+if st.session_state.ahead > 1:
+    # Thanh trượt chọn step ahead (nếu ahead > 1)
+    step_ahead = st.sidebar.slider("Select Step Ahead", min_value=1, max_value=st.session_state.ahead, value=1) - 1
+else:
+    # Đặt step_ahead mặc định là 0 nếu ahead = 1
+    step_ahead = 1
+    st.sidebar.write("Only 1 step ahead available, no selection needed.")
+
+# Nút 7: Plot Result theo 3 trường hợp tuỳ chọn
+if st.button("Plot Result"):
+    # # Lấy kết quả dự đoán
+    # predictions, true_values = evaluate_and_predict(evaluation_option, st.session_state.model_manager, n_steps)   
+    
+    # # Giải chuẩn hóa cả X và y nếu đã normalize
+    # if 'y_scaler' in st.session_state:
+    #     predictions = st.session_state.y_scaler.inverse_transform(predictions.reshape(-1, predictions.shape[-1])).reshape(predictions.shape)
+    #     true_values = st.session_state.y_scaler.inverse_transform(true_values.reshape(-1, true_values.shape[-1])).reshape(true_values.shape)
+              
+    # # Lấy các chỉ số của đặc trưng được chọn
+    # selected_feature_indices = [int(f.split()[1]) - 1 for f in selected_features]
+
+    # Gọi hàm vẽ tương ứng
+    if evaluation_option in ["Test Dataset", "Validation Dataset"]:
+
+        # copy khối ngoài bỏ vào đây************************
+        # Lấy kết quả dự đoán
+        predictions, true_values = evaluate_and_predict(evaluation_option, st.session_state.model_manager, n_steps)   
+        
+        # Giải chuẩn hóa cả X và y nếu đã normalize
+        if 'y_scaler' in st.session_state:
+            predictions = st.session_state.y_scaler.inverse_transform(predictions.reshape(-1, predictions.shape[-1])).reshape(predictions.shape)
+            true_values = st.session_state.y_scaler.inverse_transform(true_values.reshape(-1, true_values.shape[-1])).reshape(true_values.shape)
+                
+        # Lấy các chỉ số của đặc trưng được chọn
+        selected_feature_indices = [int(f.split()[1]) - 1 for f in selected_features]        
+        # copy khối ngoài bỏ vào đây***********************
+
+        # Lọc true_values và predictions theo các đặc trưng đã chọn
+        # selected_feature_indices = [int(f.split()[1]) - 1 for f in selected_features]
+
+        # true_values = true_values[:, :, selected_feature_indices]
+        # predictions = predictions[:, :, selected_feature_indices]
+
+        ##############################################################
+        # có vẻ đây là chìa khoá cho vụ ahead = 1
+        # Lọc theo các đặc trưng đã chọn dựa trên số chiều
+        if predictions.ndim == 3:
+            predictions = predictions[:, :, selected_feature_indices]
+            true_values = true_values[:, :, selected_feature_indices] if true_values is not None else None
+        else:
+            predictions = predictions[:, selected_feature_indices]
+
+
+        # # Kiểm tra số chiều của true_values và predictions
+        # if true_values.ndim == 2:
+        #     true_values = true_values[:, selected_feature_indices]
+        #     predictions = predictions[:, selected_feature_indices]
+        # else:
+        #     true_values = true_values[:, :, selected_feature_indices]
+        #     predictions = predictions[:, :, selected_feature_indices]
+
+        # Gọi hàm vẽ với các đặc trưng đã chọn
+        # plot_test_validation_results(true_values, predictions, evaluation_option)
+        # plot_test_validation_results(true_values, predictions, evaluation_option, selected_features)
+        plot_test_validation_results(true_values, predictions, evaluation_option, selected_features, step_ahead)
+
+    elif evaluation_option == "Forecast n Steps Ahead":
+        # plot_forecast_results(predictions, n_steps)
+        # predictions = predictions[:, selected_feature_indices]
+        # plot_forecast_results(predictions, n_steps, selected_features)
+
+        # copy khối ngoài bỏ vào đây************************
+        # Lấy kết quả dự đoán
+        predictions, true_values = evaluate_and_predict(evaluation_option, st.session_state.model_manager, n_steps)   
+        
+        # Giải chuẩn hóa cả X và y nếu đã normalize
+        if 'y_scaler' in st.session_state:
+            predictions = st.session_state.y_scaler.inverse_transform(predictions.reshape(-1, predictions.shape[-1])).reshape(predictions.shape)
+            # true_values = st.session_state.y_scaler.inverse_transform(true_values.reshape(-1, true_values.shape[-1])).reshape(true_values.shape)
+                
+        # Lấy các chỉ số của đặc trưng được chọn
+        selected_feature_indices = [int(f.split()[1]) - 1 for f in selected_features]        
+        # copy khối ngoài bỏ vào đây***********************
+
+
+        # Lấy mẫu cuối cùng từ X_test để làm X_last
+        # X_last = st.session_state.X_test[-1:, :, selected_feature_indices]  # Lọc các đặc trưng đã chọn
+
+        # Lấy mẫu cuối cùng từ X_test để làm X_last (không lọc đặc trưng lúc này)
+        X_last = st.session_state.X_test[-1:, :, :]  # Lấy toàn bộ đặc trưng trước khi giải chuẩn hóa
+
+        # Giải chuẩn hóa X_last nếu x_scaler có tồn tại
+        if 'x_scaler' in st.session_state:
+            X_last = st.session_state.x_scaler.inverse_transform(
+                X_last.reshape(-1, X_last.shape[-1])
+            ).reshape(X_last.shape)
+
+        # Lọc X_last và predictions theo các đặc trưng đã chọn sau khi giải chuẩn hóa
+        X_last = X_last[:, :, selected_feature_indices]
+
+        predictions = predictions[:, selected_feature_indices]        
+
+        # predictions = predictions[:, selected_feature_indices]
+        plot_forecast_results(X_last, predictions, n_steps, selected_features)
+
 
 # D. readme.md
 # Khi bạn nạp dữ liệu vào mô hình LSTM, kích thước của các tensor đầu vào nên như sau:
@@ -518,3 +918,4 @@ if st.session_state.training_complete:
 # sequence_length chính là timesteps
 # còn input_size chính là số lượng features đầu vào
 # còn output_size là số features muốn dự đoán
+
